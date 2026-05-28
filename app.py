@@ -44,7 +44,10 @@ def load_and_parse_csvs():
     
     for i in range(1, 19):
         # 严格匹配你的文件命名
-        filename = f"课表.xlsx - 第{chinese_nums[i]}周.csv"
+        # 兼容带空格和不带空格的两种文件名
+        filename1 = f"课表.xlsx - 第{chinese_nums[i]}周.csv"
+        filename2 = f"课表.xlsx - 第{chinese_nums[i]}周 .csv"
+        filename = filename2 if os.path.exists(filename2) else filename1filename = f"课表.xlsx - 第{chinese_nums[i]}周.csv"
         
         if not os.path.exists(filename):
             parsed_schedule[i] = pd.DataFrame()
