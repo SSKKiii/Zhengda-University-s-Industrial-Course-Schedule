@@ -5,7 +5,7 @@ import pytz
 import os
 
 # --- 页面全局配置 ---
-st.set_page_config(page_title="实时智能课表", page_icon="🏫", layout="wide")
+st.set_page_config(page_title="郑州大学2026学年春季学期实时课表", page_icon="🏫", layout="wide")
 
 # --- 1. 核心时间与映射逻辑 ---
 tz = pytz.timezone('Asia/Taipei')
