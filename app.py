@@ -22,7 +22,6 @@ real_week = max(1, min(real_week, 18))
 weekday_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"}
 weekday_short = {0: "周一", 1: "周二", 2: "周三", 3: "周四", 4: "周五", 5: "周六", 6: "周日"}
 
-# 中文数字映射，用于匹配文件名
 chinese_nums = {
     1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六', 7: '七', 8: '八', 9: '九', 
     10: '十', 11: '十一', 12: '十二', 13: '十三', 14: '十四', 15: '十五', 16: '十六', 17: '十七', 18: '十八'
@@ -43,13 +42,15 @@ def load_and_parse_csvs():
     debug_info = {"files_found": []}
     
     for i in range(1, 19):
-        # 严格匹配你的文件命名
-        # 兼容带空格和不带空格的两种文件名
-        filename1 = f"课表.xlsx - 第{chinese_nums[i]}周.csv"
-        filename2 = f"课表.xlsx - 第{chinese_nums[i]}周 .csv"
-        filename = filename2 if os.path.exists(filename2) else filename1filename = f"课表.xlsx - 第{chinese_nums[i]}周.csv"
+        # 兼容带有空格和不带空格的文件名
+        filename_no_space = f"课表.xlsx - 第{chinese_nums[i]}周.csv"
+        filename_with_space = f"课表.xlsx - 第{chinese_nums[i]}周 .csv"
         
-        if not os.path.exists(filename):
+        if os.path.exists(filename_with_space):
+            filename = filename_with_space
+        elif os.path.exists(filename_no_space):
+            filename = filename_no_space
+        else:
             parsed_schedule[i] = pd.DataFrame()
             continue
             
@@ -191,7 +192,7 @@ if not morning_df.empty:
 else:
     st.write("🍵 上午无课")
 
-st.write("") # 增加一点垂直留白
+st.write("") # 增加垂直留白
 
 # 下午视图区
 st.subheader("🌙 下午与晚间时段")
@@ -209,5 +210,5 @@ st.divider()
 with st.expander("🛠️ 后台诊断工具"):
     st.write(f"已成功找到 {len(debug_log.get('files_found', []))} 个课表文件。")
     if len(debug_log.get("files_found", [])) == 0:
-        st.error("警告：未读取到任何文件，请检查文件名是否包含类似 '课表.xlsx - 第一周.csv' 的字样。")
+        st.error("警告：未读取到任何文件，请检查文件名。")
     st.json(debug_log)
