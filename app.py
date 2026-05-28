@@ -35,44 +35,62 @@ time_mapping = {
     "9-10": {"时段": "下午", "时间": "19:00-20:30"}
 }
 
-# --- 2. 多 CSV 文件自动解析模块 ---
+# --- 2. 增强型自适应编码 CSV 解析模块 ---
 @st.cache_data
 def load_and_parse_csvs():
     parsed_schedule = {}
-    debug_info = {"files_found": []}
+    debug_info = {"files_found": [], "encoding_used": {}, "raw_data_preview": {}}
     
     for i in range(1, 19):
-        # 兼容带有空格和不带空格的文件名
-        filename_no_space = f"课表.xlsx - 第{chinese_nums[i]}周.csv"
-        filename_with_space = f"课表.xlsx - 第{chinese_nums[i]}周 .csv"
+        possible_names = [
+            f"课表.xlsx - 第{chinese_nums[i]}周.csv",
+            f"课表.xlsx - 第{chinese_nums[i]}周 .csv",
+            f"课表-第{i}周.xlsx - Sheet1.csv"
+        ]
         
-        if os.path.exists(filename_with_space):
-            filename = filename_with_space
-        elif os.path.exists(filename_no_space):
-            filename = filename_no_space
-        else:
+        filename = None
+        for name in possible_names:
+            if os.path.exists(name):
+                filename = name
+                break
+                
+        if not filename:
             parsed_schedule[i] = pd.DataFrame()
             continue
             
         debug_info["files_found"].append(filename)
         
-        try:
-            raw_df = pd.read_csv(filename, header=None)
-            if raw_df.empty:
+        raw_df = None
+        used_enc = None
+        for enc in ['utf-8', 'gbk', 'gb18030', 'utf-8-sig']:
+            try:
+                raw_df = pd.read_csv(filename, header=None, encoding=enc)
+                used_enc = enc
+                break 
+            except Exception:
                 continue
                 
+        if raw_df is None or raw_df.empty:
+            parsed_schedule[i] = pd.DataFrame()
+            continue
+            
+        debug_info["encoding_used"][filename] = used_enc
+        
+        if i == real_week:
+            debug_info["raw_data_preview"] = raw_df.head(10).astype(str).to_dict()
+
+        try:
+            # 🎯 核心修复点：极其严格的表头定位机制
             header_row_idx = 0
             for idx, row in raw_df.iterrows():
-                row_str = "".join([str(x) for x in row.values])
-                if "一" in row_str or "周" in row_str or "星" in row_str:
+                row_str = "".join([str(x) for x in row.values if pd.notna(x)])
+                # 只有当一行同时出现“周一”和“周二”（或星期一、二）时，才认定为真正的表头，忽略大标题
+                if ("周一" in row_str or "星期一" in row_str) and ("周二" in row_str or "星期二" in row_str):
                     header_row_idx = idx
                     break
                     
-            df_cleaned = pd.read_csv(filename, skiprows=header_row_idx)
+            df_cleaned = pd.read_csv(filename, skiprows=header_row_idx, encoding=used_enc)
             
-            if i == real_week:
-                debug_info["current_week_columns"] = list(df_cleaned.columns)
-
             flat_rows = []
             for weekday_idx, weekday_name in weekday_map.items():
                 short_name = weekday_short[weekday_idx]
@@ -113,17 +131,11 @@ def load_and_parse_csvs():
                     lines = [line.strip() for line in str(cell_value).split('\n') if line.strip()]
                     
                     if len(lines) == 1:
-                        course = lines[0]
-                        teacher = "-"
-                        room = "-"
+                        course, room, remarks = lines[0], "-", "-"
                     elif len(lines) == 2:
-                        course = lines[0]
-                        teacher = "-"
-                        room = lines[1]
+                        course, room, remarks = lines[0], lines[1], "-"
                     elif len(lines) >= 3:
-                        course = lines[0]
-                        teacher = lines[1]
-                        room = lines[2]
+                        course, room, remarks = lines[0], lines[1], lines[2]
                     else:
                         continue
                         
@@ -133,14 +145,14 @@ def load_and_parse_csvs():
                         "节次": matched_key,
                         "具体时间": exact_time,
                         "课程": course,
-                        "老师": teacher,
-                        "教室": room
+                        "教师与教室": room,
+                        "周次/备注": remarks
                     })
                     
             parsed_schedule[i] = pd.DataFrame(flat_rows)
             
         except Exception as e:
-            debug_info[f"error_week_{i}"] = str(e)
+            debug_info[f"parsing_error_week_{i}"] = str(e)
             parsed_schedule[i] = pd.DataFrame()
             
     return parsed_schedule, debug_info
@@ -192,7 +204,7 @@ if not morning_df.empty:
 else:
     st.write("🍵 上午无课")
 
-st.write("") # 增加垂直留白
+st.write("")
 
 # 下午视图区
 st.subheader("🌙 下午与晚间时段")
@@ -204,11 +216,3 @@ if not afternoon_df.empty:
     st.dataframe(afternoon_df, use_container_width=True, hide_index=True)
 else:
     st.write("🍵 下午无课")
-
-# --- 5. 底部诊断器 ---
-st.divider()
-with st.expander("🛠️ 后台诊断工具"):
-    st.write(f"已成功找到 {len(debug_log.get('files_found', []))} 个课表文件。")
-    if len(debug_log.get("files_found", [])) == 0:
-        st.error("警告：未读取到任何文件，请检查文件名。")
-    st.json(debug_log)
