@@ -179,7 +179,7 @@ selected_weekday_name = st.sidebar.selectbox(
 selected_weekday_idx = [k for k, v in weekday_map.items() if v == selected_weekday_name][0]
 
 # --- 4. 主界面视图渲染 (上下排布) ---
-st.title("🏫 智能实时课表")
+st.title("🏫 郑州大学2026学年春季学期实时课表")
 
 is_current_day = (selected_week == real_week) and (selected_weekday_idx == real_weekday)
 
